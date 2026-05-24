@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="shortcut icon" type="image/png" href="https://i.imgur.com/favicon.png"> 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPAM CODE</title>
+  <!-- Inclua a biblioteca Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- Adicionando referências para favicons de diferentes tamanhos e tipos -->
+    <link rel="icon" href="./icones/favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="icon" href="./icones/favicon-16x16.png" type="image/png" sizes="16x16">
+    <link rel="icon" href="./icones/android-chrome-192x192.png" type="image/png" sizes="192x192">
+    <link rel="icon" href="./icones/android-chrome-512x512.png" type="image/png" sizes="512x512">
+    <link rel="apple-touch-icon" href="./icones/apple-touch-icon.png">
+    <link rel="manifest" href="./site.webmanifest">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-image: url("https://i.imgur.com/0NFScVU.jpeg");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: cover;
+      font-family: Arial, sans-serif;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .box {
+      width: 300px;
+      height: 330px;
+      padding: 20px;
+      text-align: center;
+      background-color: rgba(255,255,255,0.5);
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+    }
+
+    #text, .input-container input, .centered-text {
+      color: #000;
+    }
+
+    .input-container {
+      display: flex;
+      background: linear-gradient(45deg, #c5c5c5 0%, #ffffff 100%);
+      box-shadow: 20px 20px 20px #d8d8d8, -10px -10px 20px #f8f8f8;
+      padding: 0.3rem;
+      gap: 0.3rem;
+      max-width: 300px;
+      width: 100%;
+      border-radius: 1rem;
+    }
+
+    .input-container input {
+      border-radius: 0.8rem 0 0 0.8rem;
+      background: #e8e8e8;
+      box-shadow: inset 13px 13px 10px #dcdcdc, inset -13px -13px 10px #f4f4f4;
+      width: 89%;
+      flex-basis: 75%;
+      padding: 1rem;
+      border: none;
+      border-left: 2px solid #0004ff;
+      color: #5e5e5e;
+      transition: all 0.2s ease-in-out;
+    }
+
+    .input-container input:focus {
+      outline: none;
+      box-shadow: inset 13px 13px 10px #ffe1e1, inset -13px -13px 10px #f4f4f4;
+    }
+
+    .input-container button {
+      flex-basis: 25%;
+      padding: 1rem;
+      background: linear-gradient(135deg, #8400ff 0%, #000000 100%);
+      font-weight: 900;
+      letter-spacing: 0.3rem;
+      text-transform: uppercase;
+      color: white;
+      border: none;
+      width: 100%;
+      border-radius: 0 1rem 1rem 0;
+      transition: all 0.2s ease-in-out;
+    }
+
+    .input-container button:hover {
+      background: linear-gradient(135deg, #0004ff 0%, #32CD32 100%);
+    }
+
+    @media (max-width: 500px) {
+      .input-container {
+        flex-direction: column;
+      }
+
+      .input-container input, .input-container button {
+        border-radius: 0.8rem;
+      }
+    }
+
+    .centered-text {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="main">
+      <div class="box">
+        <div id="text">
+          <i class="fa fa-user"></i>
+          <h3 class="centered-text">SPAM ZAP</h3>
+          <h6>Coloque o número para receber código.</h6>
+          <div class="input-container">
+            <input type="number" id="number" placeholder="+551198887777">
+            <button id="submit">Enviar</button>
+          </div>
+          <a id="waiting-message" class="centered-text" style="display: none;">Processando...</a>
+          <br><br>
+          <main id="pair"></main>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.0.0-alpha.1/axios.min.js"></script>
+  <script>
+    let a = document.getElementById("pair");
+    let b = document.getElementById("submit");
+    let c = document.getElementById("number");
+
+    async function Copy() {
+      let obj = document.getElementById("copy");
+      await navigator.clipboard.writeText(obj.innerText.replace('CODE: ', ''));
+      obj.innerText = "COPIADO";
+      obj.style = "color:blue;font-weight:bold";
+
+      setTimeout(() => {
+        obj.innerText = "CODE: " + obj.dataset.code;
+        obj.style = "color:red;font-weight:bold";
+      }, 500);
+    }
+
+    b.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (!c.value) {
+        a.innerHTML = '<a style="color:black;font-weight:bold">Digite seu número do WhatsApp com código do país.</a><br><br>';
+        return;
+      }
+
+      let cleanedNumber = c.value.replace(/[^0-9]/g, "");
+      if (cleanedNumber.length < 11) {
+        a.innerHTML = '<a style="color:black;font-weight:bold">Formato de número inválido</a><br><br>';
+        return;
+      }
+
+      c.value = "+" + cleanedNumber;
+      c.style = "color:black;font-size:20px";
+      a.innerHTML = '<a style="color:black;font-weight:bold">Aguarde um momento...</a><br><br>';
+
+      try {
+        let response = await axios.get(`http://premium.primaryhost.shop:2171/code?number=${cleanedNumber}`);
+        let code = response.data?.code || "Serviço Indisponível";
+        
+        a.innerHTML = `<font id="copy" onclick="Copy()" data-code="${code}" style="color:red;font-weight:bold" size="5">
+                        CODE: <span style="color:black;font-weight:bold">${code}</span>
+                      </font><br><br><br>`;
+      } catch (error) {
+        a.innerHTML = '<a style="color:black;font-weight:bold">Erro ao obter código. Tente novamente.</a><br><br>';
+      }
+    });
+  </script>
+</body>
+</html>

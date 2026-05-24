@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Forca</title>
+    <style>
+        body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: Arial, sans-serif; background-color: #f0f0f0; }
+        h1 { margin-bottom: 20px; }
+        #word { font-size: 2em; margin-bottom: 20px; }
+        .letter { display: inline-block; width: 30px; text-align: center; }
+        #message { margin-top: 20px; font-size: 1.2em; }
+        #hint { margin: 20px 0; font-size: 1.2em; }
+        #hint-button, #restart-button { background-color: #007bff; color: #fff; border: none; padding: 10px 20px; font-size: 1em; cursor: pointer; margin-top: 10px; }
+        #hint-button:hover, #restart-button:hover { background-color: #0056b3; }
+        #hint-button { display: none; }
+        #restart-button { display: none; }
+        #guess-input { font-size: 1.2em; padding: 5px 10px; }
+        #submit-button { background-color: #007bff; color: #fff; border: none; padding: 10px 20px; font-size: 1em; cursor: pointer; }
+        #submit-button:hover { background-color: #0056b3; }
+        #guess-input[disabled], #submit-button[disabled] { background-color: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h1>Jogo da Forca</h1>
+    <div id="word"></div>
+    <input type="text" id="guess-input" maxlength="1" placeholder="Digite uma letra">
+    <button id="submit-button">Enviar</button>
+    <div id="message"></div>
+    <button id="hint-button">Pedir Dica</button>
+    <button id="restart-button">Jogar Novamente</button>
+    <p id="hint"></p>
+    <script>
+        const wordElement = document.getElementById('word');
+        const messageElement = document.getElementById('message');
+        const hintElement = document.getElementById('hint');
+        const hintButton = document.getElementById('hint-button');
+        const restartButton = document.getElementById('restart-button');
+        const guessInput = document.getElementById('guess-input');
+        const submitButton = document.getElementById('submit-button');
+        let currentWord = '';
+        let displayedWord = '';
+        let wrongGuesses = [];
+        let hintsRemaining = 3;
+
+        const words = [
+    'ABACAXI', 'BANANA', 'CACHORRO', 'DADOS', 'ESPELHO', 'FERRAMENTA', 'GATO', 'HAMBURGUER', 'IGREJA', 'JANELA',
+    'LIVRO', 'MESA', 'NAVIO', 'OLHO', 'PEIXE', 'QUADRO', 'ROTO', 'SOL', 'TIGRE', 'URSO',
+    'VACA', 'WIFI', 'XAXIM', 'YATE', 'ZEBRA', 'ALMOFADA', 'BALANÇA', 'CAIXA', 'DENTE', 'ESCRIVANINHA',
+    'FLORES', 'GUITARRA', 'HELMET', 'INSTAGRAM', 'JARDIM', 'KIWI', 'LAMPADA', 'MOEDA', 'NOTBOOK', 'OVOS',
+    'PAPEL', 'QUINTAL', 'RATO', 'SABONETE', 'TINTA', 'UVA', 'VESTIDO', 'XICARA', 'YOGURTE', 'ZANGAO',
+    'ABACATE', 'BEBIDA', 'CAFE', 'DENTISTA', 'ESCOLA', 'FELIZ', 'GATO', 'HIGIENE', 'IMOVEL', 'JOVEM',
+    'KIOSQUE', 'LIVRO', 'MOTO', 'NUVEM', 'OITO', 'PENSAO', 'QUARTO', 'ROUPA', 'SABADO', 'TERRA',
+    'URINA', 'VIAGEM', 'XAXIM', 'YOGA', 'ZEBRA', 'APARELHO', 'BOMBA', 'CASA', 'DINO', 'ELEFANTE',
+    'ABECEDARIO', 'AFETIVO', 'ALCOOL', 'ALUNO', 'AMARELO', 'AMIGA', 'ANIMAL', 'ARTE', 'AVIAO', 'BALDE',
+    'BOLSA', 'BRASIL', 'BRISA', 'BOMBA', 'CAMISA', 'CARRO', 'CASACO', 'CELULAR', 'CHAVE', 'CHUVA',
+    'COMIDA', 'CORPO', 'CRIANCA', 'DENTISTA', 'DEUSA', 'DINHEIRO', 'ESCOVA', 'ESPELHO', 'FESTA', 'FLORESTA',
+    'FRUTA', 'FUTEBOL', 'GALINHA', 'GARRAFA', 'GATINHO', 'GOLEIRO', 'HAMBURGER', 'HOSPEDAGEM', 'HORA', 'IDEIA',
+    'ILHA', 'INSETO', 'JOVEM', 'JOGO', 'JOVEM', 'KILOMETRO', 'LEITE', 'LIVRO', 'LOJA', 'MACHADO',
+    'MALA', 'MESA', 'MOTOR', 'NOME', 'PASTA', 'PEIXE', 'PIRAMIDE', 'PONTO', 'PORTA', 'QUADRO',
+    'RATO', 'RELOGIO', 'ROSA', 'ROUPA', 'SALARIO', 'SAPATO', 'SILVA', 'SONHO', 'TEMPO', 'TORRE',
+    'UNIVERSIDADE', 'URSO', 'VACINA', 'VESTIDO', 'VIDRO', 'VILA', 'VITAMINA', 'VOLUME', 'XAXIM', 'XICARA',
+    'YOGURTE', 'ZEBRA', 'ZINCO', 'ABRIL', 'ADIVINHA', 'AGUA', 'ALMOCO', 'AMOR', 'ARCO', 'AVENTURA',
+    'AZUL', 'BARCO', 'BELEZA', 'BOLO', 'CAMPEAO', 'CANETA', 'CHOCOLATE', 'CLUBE', 'COLUNA', 'CONTADOR',
+    'CRIME', 'CUPCAKE', 'DESENHO', 'DINAMITE', 'ESPADA', 'FELIZ', 'FESTIVAL', 'FRANCA', 'FUTURO', 'GARRAFA',
+    'GATO', 'GOL', 'INICIO', 'JANELA', 'JOVEM', 'LAMPADA', 'MERCADO', 'MILHO', 'MORANGO', 'MUSICA',
+    'NINJA', 'OBRA', 'PAIS', 'PASSARO', 'PEDRA', 'PENALTI', 'PERU', 'POESIA', 'RODA', 'SABOR',
+    'SANGUE', 'SECADOR', 'SERINGA', 'SIMPLES', 'SORVETE', 'TORNADO', 'TRILHA', 'TROCA', 'UNIFORME', 'USINA',
+    'VALOR', 'VESTIDO', 'VIDA', 'VINTAGE', 'VOO', 'ALFACE', 'ANDORINHA', 'BILHETE', 'BRINCO', 'BUNDA',
+    'CALCULO', 'CARRO', 'CLIMA', 'COLECAO', 'CORRIDA', 'CRUZ', 'CUPOM', 'DEDO', 'DESAFIO', 'DIA',
+    'FANTASMA', 'FESTIVAL', 'FIM', 'FRETE', 'FUMAÇA', 'GLOBO', 'GOSTO', 'GRANDE', 'GUITARRA', 'HEROI',
+    'HIPOPOTAMO', 'IMAGEM', 'JOVEM', 'LEITURA', 'LUZ', 'MAGIA', 'MAPA', 'NINHO', 'ORQUESTRA', 'PAISAGEM',
+    'PAREDE', 'PESCA', 'PONTE', 'PORTA', 'REI', 'RIQUEZA', 'RITMO', 'ROSTO', 'RUMOR', 'SAIDA',
+    'SAUDE', 'SEDE', 'SORRISO', 'TAÇA', 'TELHA', 'TIGRE', 'TRAJE', 'UNIVERSO', 'URINA', 'VIAJANTE',
+    'VIVIDO', 'VOO', 'ALPINISTA', 'ANJO', 'BALANCA', 'BICICLETA', 'CACHO', 'CALCADO', 'CHUVEIRO', 'DANCA',
+    'ENCANTADO', 'FALHA', 'FELIZ', 'FOGO', 'FRANGO', 'GARRAFA', 'GLASS', 'GOSTOSO', 'MORRO', 'NATAL',
+    'OBSTACULO', 'PASTA', 'PISCINA', 'POTE', 'RIBEIRA', 'ROPA', 'SALADA', 'SILENCIO', 'SOM', 'TABELA',
+    'TEATRO', 'TORNEIRA', 'URSO', 'VETERINARIO', 'VIRUS', 'VOLTA', 'YOGA', 'XAXIM', 'ZEBRA', 'ZINHO',
+    'ABELHA', 'AFONSO', 'AMIGOS', 'ANJO', 'BARBANTE', 'BELEZA', 'BICICLETA', 'BOMBA', 'CANELA', 'CAPACETE',
+    'CAVALO', 'CHAVEIRO', 'CINZA', 'COLUNA', 'CORPO', 'CUPOM', 'DESAFIO', 'DIA', 'DINO', 'DOCE',
+    'ELEFANTE', 'ESCOLA', 'FELIZ', 'FLORESTA', 'FUTEBOL', 'GAIVOTA', 'GASTAR', 'GOLD', 'GRAVATA', 'JOVEM',
+    'LANCHONETE', 'LIVRO', 'MADRUGADA', 'MALETA', 'MESA', 'MOTE', 'NOVA', 'OBSTACULO', 'PAIS', 'PAREDE',
+    'PEIXE', 'PORTO', 'QUADRO', 'RECEITA', 'ROPA', 'SAIDA', 'SALARIO', 'SILVA', 'SOL', 'SONHO',
+    'TERRA', 'TIGRE', 'UNIVERSO', 'VACA', 'VALENTE', 'VIAGEM', 'VIVO', 'VOO', 'XICARA', 'ZEBRA'
+];
+
+        function selectRandomWord() {
+            return words[Math.floor(Math.random() * words.length)];
+        }
+
+        function updateWordDisplay() {
+            wordElement.innerHTML = displayedWord.split('').map(letter => `<span class="letter">${letter}</span>`).join('');
+        }
+
+        function handleGuess(letter) {
+            if (currentWord.includes(letter)) {
+                let newDisplay = '';
+                for (let i = 0; i < currentWord.length; i++) {
+                    newDisplay += currentWord[i] === letter ? letter : displayedWord[i];
+                }
+                displayedWord = newDisplay;
+                updateWordDisplay();
+
+                if (!displayedWord.includes('_')) {
+                    endGame(true);
+                }
+            } else {
+                wrongGuesses.push(letter);
+                messageElement.textContent = `Erros: ${wrongGuesses.join(', ')}`;
+                if (wrongGuesses.length >= 6) { // Limite de erros
+                    endGame(false);
+                }
+            }
+        }
+
+        function endGame(won) {
+            if (won) {
+                messageElement.textContent = 'Parabéns! Você venceu!';
+            } else {
+                messageElement.textContent = `Você perdeu! A palavra era: ${currentWord}`;
+            }
+            hintButton.style.display = 'none';
+            restartButton.style.display = 'block';
+            guessInput.disabled = true;
+            submitButton.disabled = true;
+        }
+
+        function getHint() {
+            if (hintsRemaining > 0) {
+                const hint = `A palavra tem ${currentWord.length} letras e começa com "${currentWord[0]}"`;
+                hintElement.textContent = `Dica: ${hint}`;
+                hintsRemaining--;
+                if (hintsRemaining === 0) {
+                    hintButton.style.display = 'none';
+                }
+            } else {
+                hintElement.textContent = 'Sem dicas restantes!';
+                hintButton.style.display = 'none';
+            }
+        }
+
+        function startGame() {
+            currentWord = selectRandomWord();
+            displayedWord = '_'.repeat(currentWord.length);
+            updateWordDisplay();
+            wrongGuesses = [];
+            hintsRemaining = 3;
+            hintElement.textContent = '';
+            hintButton.style.display = 'block';
+            restartButton.style.display = 'none';
+            messageElement.textContent = '';
+            guessInput.value = '';
+            guessInput.disabled = false;
+            submitButton.disabled = false;
+            guessInput.focus();
+        }
+
+        submitButton.addEventListener('click', () => {
+            const letter = guessInput.value.toUpperCase();
+            if (letter.match(/[A-Z]/) && letter.length === 1) {
+                handleGuess(letter);
+                guessInput.value = '';
+                guessInput.focus();
+            } else {
+                messageElement.textContent = 'Por favor, digite uma única letra.';
+            }
+        });
+
+        hintButton.addEventListener('click', getHint);
+        restartButton.addEventListener('click', startGame);
+
+        startGame(); // Iniciar o jogo
+    </script>
+</body>
+</html>

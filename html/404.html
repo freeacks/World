@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ops! Erro 404 - Página não encontrada</title>
+<!-- Adicionando referências para favicons de diferentes tamanhos e tipos -->
+    <link rel="icon" href="./icones/favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="icon" href="./icones/favicon-16x16.png" type="image/png" sizes="16x16">
+    <link rel="icon" href="./icones/android-chrome-192x192.png" type="image/png" sizes="192x192">
+    <link rel="icon" href="./icones/android-chrome-512x512.png" type="image/png" sizes="512x512">
+    <link rel="apple-touch-icon" href="./icones/apple-touch-icon.png">
+    <link rel="manifest" href="./site.webmanifest">
+  <style>
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-image: url('https://i.imgur.com/MriAGw6.png');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+}
+
+.container {
+  text-align: center;
+  background-color: rgba(0, 0, 0, 0.5);
+  border: 2px solid #98FB98;
+  padding: 20px;
+  color: white;
+  max-width: 600px;
+  width: 80%;
+}
+
+h1 {
+  color: white;
+}
+
+a {
+  color: green;
+  text-decoration: none;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.search-bar input[type="text"] {
+  width: 70%;
+  padding: 8px;
+  border: none;
+  border-bottom: 2px solid #98FB98;
+  outline: none;
+  font-size: 16px;
+  background-color: transparent;
+  color: white;
+}
+
+.search-bar button {
+  background-color: #98FB98;
+  border: none;
+  padding: 8px 15px;
+}
+
+/* Estilize o ícone dentro do botão */
+.search-bar button img {
+  width: 24px; /* Defina o tamanho desejado do ícone */
+  height: 24px; /* Defina o tamanho desejado do ícone */
+}
+
+.search-btn {
+  background-color: #98FB98;
+  border: none;
+  padding: 0; /* Remover o preenchimento interno do botão */
+  cursor: pointer;
+  width: 24px; /* Defina a largura desejada do botão igual ao tamanho do ícone */
+  height: 24px; /* Defina a altura desejada do botão igual ao tamanho do ícone */
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Erro 404 - Página não encontrada</h1>
+  <p>Lamentamos, mas a página que você está procurando não foi encontrada.</p>
+  <p><a href="/">Voltar para a página inicial</a></p>
+  
+  <!-- Barra para pesquisar DDD -->
+  <div class="search-bar">
+    <input type="text" id="input-ddd" placeholder="Digite um DDD">
+    <button id="btn-pesquisar-ddd"><img src="https://i.imgur.com/ngqVTk1.png" alt="Pesquisar"></button>
+  </div>
+  
+  <!-- Barra para pesquisar clima -->
+  <div class="search-bar">
+    <input type="text" id="input-cidade" placeholder="Digite o nome da cidade">
+    <button id="btn-pesquisar-clima"><img src="https://i.imgur.com/ngqVTk1.png" alt="Pesquisar"></button>
+  </div>
+  
+  <!-- Campo de entrada e botão para criar um apelido -->
+  <div class="search-bar">
+    <input type="text" id="input-nick" placeholder="Digite o texto para o Nick">
+    <button id="btn-criar-nick"><img src="https://i.imgur.com/ngqVTk1.png" alt="Pesquisar"></button>
+  </div>
+
+  <!-- Container para exibir o texto estilizado -->
+  <div id="nick-info"></div>
+
+  <!-- Informações do clima -->
+  <div id="clima-info"></div>
+
+  <!-- Informações do DDD -->
+  <div id="ddd-info"></div>
+
+</div>
+<audio autoplay loop>
+        <source src="./musicas/m.mp3" type="audio/mpeg">
+        Seu navegador não suporta áudio HTML5.
+</audio>
+   <!-- Seu JavaScript aqui -->
+     <script>
+// Função para buscar o clima de uma cidade
+async function buscarClimaDaCidade(cidade) {
+    try {
+        const resposta = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${cidade}&appid=f5c0840c2457fbb64188a6d4be05618f&units=metric&lang=pt_br`);
+        if (!resposta.ok) {
+            throw new Error("Cidade não encontrada");
+        }
+        const clima = await resposta.json();
+        return clima;
+    } catch (erro) {
+        console.error("Erro ao buscar o clima:", erro);
+        return { error: true };
+    }
+}
+
+// Função para exibir as informações do clima
+function exibirInformacoesDoClima(clima) {
+    if (clima.error) {
+        console.log("Desculpe, ocorreu um erro ao buscar as informações do clima.");
+        return;
+    }
+    
+    const informacoes = `
+🌞 Temperatura agora: ${clima.main.temp}ºC
+🏙️ Cidade: ${clima.name}
+🔥 Temperatura Máxima: ${clima.main.temp_max}°C
+❄ Temperatura Mínima: ${clima.main.temp_min}°C
+🌦 Clima: ${clima.weather[0].description}
+💧 Umidade de ar: ${clima.main.humidity}%
+🌫 Ventos: ${clima.wind.speed}
+    `;
+    
+    document.getElementById("clima-info").innerHTML = informacoes;
+}
+
+// Função para lidar com a pesquisa do clima
+async function pesquisarClima() {
+    const cidade = document.getElementById("input-cidade").value;
+    const clima = await buscarClimaDaCidade(cidade);
+    exibirInformacoesDoClima(clima);
+}
+
+// Adicionar evento de clique ao botão de pesquisa de clima
+document.getElementById("btn-pesquisar-clima").addEventListener("click", pesquisarClima);
+
+
+// Função para buscar informações do DDD
+async function buscarInformacoesDoDDD(ddd) {
+    try {
+        const resposta = await fetch(`https://brasilapi.com.br/api/ddd/v1/${ddd}`);
+        if (!resposta.ok) {
+            throw new Error("DDD não encontrado");
+        }
+        const dados = await resposta.json();
+        return dados;
+    } catch (erro) {
+        console.error("Erro ao buscar informações do DDD:", erro);
+        return { error: true };
+    }
+}
+
+// Função para lidar com a pesquisa do DDD
+async function pesquisarDDD() {
+    const ddd = document.getElementById("input-ddd").value;
+    const dados = await buscarInformacoesDoDDD(ddd);
+    if (dados.error) {
+        console.log("Desculpe, ocorreu um erro ao buscar informações do DDD.");
+    } else {
+        exibirInformacoesDoDDD(dados);
+    }
+}
+
+// Função para exibir as informações do DDD
+function exibirInformacoesDoDDD(dados) {
+    if (dados.error) {
+        console.log("Desculpe, ocorreu um erro ao buscar informações do DDD.");
+        return;
+    }
+
+    let informacoes = `ℹ️ DDD: ${dados.state}\n`;
+    informacoes += "📌 Cidades:\n";
+    dados.cities.forEach((cidade, index) => {
+        informacoes += `${index + 1}. ${cidade}\n`;
+    });
+
+    document.getElementById("ddd-info").innerText = informacoes;
+}
+
+// Função para buscar o texto estilizado para o Nick
+async function criarNick(texto) {
+    try {
+        const resposta = await fetch(`https://alizindev-api.onrender.com/api/tools/styletext?text=${texto}&apikey=a93e85c1`);
+        if (!resposta.ok) {
+            throw new Error("Erro ao criar o Nick");
+        }
+        const nick = await resposta.json();
+        return nick;
+    } catch (erro) {
+        console.error("Erro ao criar o Nick:", erro);
+        return { error: true, message: erro.message };
+    }
+}
+
+// Função para lidar com o clique no botão de criar Nick
+async function criarNickAoClicar() {
+    const texto = document.getElementById("input-nick").value;
+    const nick = await criarNick(texto);
+    exibirNickEstilizado(nick);
+}
+// Função para exibir o apelido estilizado
+function exibirNickEstilizado(nick) {
+    if (nick.error) {
+        console.log("Desculpe, ocorreu um erro ao criar o Nick:", nick.message);
+        return;
+    }
+
+    let nickEstilizado = "<p>Apelidos Estilizados:</p>";
+    nick.resultado.forEach(item => {
+        nickEstilizado += `<p>${item.result}</p>`;
+    });
+
+    document.getElementById("nick-info").innerHTML = nickEstilizado;
+}
+       
+// Adicionar eventos de clique aos botões de pesquisa
+document.getElementById("btn-pesquisar-ddd").addEventListener("click", pesquisarDDD);
+document.getElementById("btn-pesquisar-clima").addEventListener("click", pesquisarClima);
+document.getElementById("btn-criar-nick").addEventListener("click", criarNickAoClicar);
+</script>
+</body>
+</html>
