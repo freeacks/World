@@ -74,36 +74,58 @@
   <div class="games" id="games"></div>
 
   <script>
-    fetch('https://world-ecletix.onrender.com/api/multicanais')
-      .then(response => response.json())
-      .then(data => {
-        const container = document.getElementById('games');
-        const jogos = data.jogos || [];
+  async function carregarJogos() {
+    try {
+      // Sua própria API
+      const response = await fetch('/api/multicanais');
+      const data = await response.json();
 
-        jogos.forEach(game => {
-          const slug = game.link.replace('https://multicanaisk.com/assistir/', '').replace(/\/$/, '');
+      const container = document.getElementById('games');
+      const jogos = data.jogos || [];
 
-          const card = document.createElement('a');
-          card.href = '/api/fut/' + slug;
-          card.className = 'game-card';
+      container.innerHTML = '';
 
-          card.innerHTML = `
-            <div class="team-logos">
-              <img src="${game.time1_foto}" alt="${game.time1}" />
-              <span style="font-size: 18px;">⚔️</span>
-              <img src="${game.time2_foto}" alt="${game.time2}" />
-            </div>
-            <div class="game-title">${game.time1} vs ${game.time2}</div>
-            <div class="game-meta">${game.campeonato}</div>
-            <div class="game-meta">${game.horario}</div>
-          `;
+      jogos.forEach(game => {
+        const slug = game.link
+          .replace('https://multicanaisk.com/assistir/', '')
+          .replace(/\/$/, '');
 
-          container.appendChild(card);
-        });
-      })
-      .catch(() => {
-        document.getElementById('games').innerText = 'Erro ao carregar os jogos.';
+        const card = document.createElement('a');
+        card.href = `/api/fut/${slug}`;
+        card.className = 'game-card';
+
+        card.innerHTML = `
+          <div class="team-logos">
+            <img src="${game.time1_foto}" alt="${game.time1}">
+            <span style="font-size:18px;">⚔️</span>
+            <img src="${game.time2_foto}" alt="${game.time2}">
+          </div>
+
+          <div class="game-title">
+            ${game.time1} vs ${game.time2}
+          </div>
+
+          <div class="game-meta">
+            ${game.campeonato}
+          </div>
+
+          <div class="game-meta">
+            ${game.horario}
+          </div>
+        `;
+
+        container.appendChild(card);
       });
+
+    } catch (err) {
+      console.error(err);
+
+      document.getElementById('games').innerText =
+        'Erro ao carregar os jogos.';
+    }
+  }
+
+  carregarJogos();
   </script>
 </body>
 </html>
