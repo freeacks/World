@@ -413,9 +413,9 @@
         async function loadData() {
             try {
                 const [channelsRes, categoriesRes, eventsRes] = await Promise.all([
-                    fetch('https://world-ecletix.onrender.com/api/channels'),
-                    fetch('https://world-ecletix.onrender.com/api/categories'),
-                    fetch('https://world-ecletix.onrender.com/api/events')
+                    fetch('https://worldecletix.onrender.com/api/channels'),
+                    fetch('https://worldecletix.onrender.com/api/categories'),
+                    fetch('https://worldecletix.onrender.com/api/events')
                 ]);
 
                 const channelsData = await channelsRes.json();
