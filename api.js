@@ -1921,7 +1921,63 @@ router.get('/igstalk', async (req, res) => {
     res.status(500).json({ error: 'Erro interno no servidor' })
   }
 })
+router.get('/embetv', async (req, res) => {
+    try {
+        const src = req.query.url;
 
+        if (!src) {
+            return res.status(400).json({ error: 'Parâmetro url obrigatório' });
+        }
+
+        let parsedUrl;
+
+        try {
+            parsedUrl = new URL(src);
+        } catch {
+            return res.status(400).json({ error: 'URL inválida' });
+        }
+
+        if (
+            parsedUrl.protocol !== 'https:' ||
+            parsedUrl.hostname !== '1799ee429f9c4a7e8e7153331fae801c.embedtv.cc'
+        ) {
+            return res.status(400).json({ error: 'Host não permitido' });
+        }
+
+        const response = await fetch(parsedUrl.href, {
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Referer': 'https://embedtv.cc/',
+                'Origin': 'https://embedtv.cc',
+                'Connection': 'keep-alive',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            },
+            redirect: 'follow',
+            signal: AbortSignal.timeout(15000)
+        });
+
+        const html = await response.text();
+
+        res.status(response.status).json({
+            status: response.status,
+            finalUrl: response.url,
+            contentType: response.headers.get('content-type'),
+            src: html.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1] || null,
+            html
+        });
+    } catch (err) {
+        console.error('[EMBETV]', err);
+
+        res.status(502).json({
+            error: 'Falha na requisição EmbedTV',
+            details: err.message
+        });
+    }
+});
 router.get('/futeproxy', async (req, res) => {
     try {
     const agent = new https.Agent({
