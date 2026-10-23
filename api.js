@@ -1921,12 +1921,15 @@ router.get('/igstalk', async (req, res) => {
     res.status(500).json({ error: 'Erro interno no servidor' })
   }
 })
-router.get('/embetv', async (req, res) => {
+
+router.get('/embedtv', async (req, res) => {
     try {
         const src = req.query.url;
 
         if (!src) {
-            return res.status(400).json({ error: 'Parâmetro url obrigatório' });
+            return res.status(400).json({
+                error: 'Parâmetro url obrigatório'
+            });
         }
 
         let parsedUrl;
@@ -1934,45 +1937,56 @@ router.get('/embetv', async (req, res) => {
         try {
             parsedUrl = new URL(src);
         } catch {
-            return res.status(400).json({ error: 'URL inválida' });
+            return res.status(400).json({
+                error: 'URL inválida'
+            });
         }
 
         if (
             parsedUrl.protocol !== 'https:' ||
             parsedUrl.hostname !== '1799ee429f9c4a7e8e7153331fae801c.embedtv.cc'
         ) {
-            return res.status(400).json({ error: 'Host não permitido' });
+            return res.status(400).json({
+                error: 'Host não permitido'
+            });
         }
 
-        const response = await fetch(parsedUrl.href, {
-            method: 'GET',
+        const response = await axios.get(parsedUrl.href, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'User-Agent':
+                    'Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+                'Accept':
+                    'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
                 'Referer': 'https://embedtv.cc/',
                 'Origin': 'https://embedtv.cc',
-                'Connection': 'keep-alive',
                 'Cache-Control': 'no-cache',
                 'Pragma': 'no-cache'
             },
-            redirect: 'follow',
-            signal: AbortSignal.timeout(15000)
+            timeout: 15000,
+            maxRedirects: 5,
+            responseType: 'text',
+            validateStatus: () => true
         });
 
-        const html = await response.text();
+        const html = response.data;
 
-        res.status(response.status).json({
+        const match = html.match(
+            /\bsrc\s*=\s*["']([^"']+)["']/i
+        );
+
+        return res.status(200).json({
             status: response.status,
-            finalUrl: response.url,
-            contentType: response.headers.get('content-type'),
-            src: html.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1] || null,
+            finalUrl: response.request?.res?.responseUrl || parsedUrl.href,
+            contentType: response.headers['content-type'] || null,
+            src: match ? match[1] : null,
             html
         });
-    } catch (err) {
-        console.error('[EMBETV]', err);
 
-        res.status(502).json({
+    } catch (err) {
+        console.error('[EMBETV]', err.message);
+
+        return res.status(502).json({
             error: 'Falha na requisição EmbedTV',
             details: err.message
         });
