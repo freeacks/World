@@ -6918,17 +6918,15 @@ router.get('/models', (req, res) => {
   });
 });
 
-// Endpoint individual de cada modelo
-router.get('/:modelo', async (req, res) => {
+router.get('/:modelo', async (req, res, next) => {
   const modelo = req.params.modelo;
-  const texto = req.query.texto;
 
+  // Se não for um modelo, deixa as outras APIs tratarem
   if (!modelos.includes(modelo)) {
-    return res.status(404).json({
-      success: false,
-      error: 'Modelo não encontrado'
-    });
+    return next();
   }
+
+  const texto = req.query.texto;
 
   if (!texto || !String(texto).trim()) {
     return res.status(400).json({
