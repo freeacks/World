@@ -6859,9 +6859,6 @@ router.get('/stabilityai', async (req, res) => {
 
 //inteligência artificial 
 
-router.get('/models', (req, res) => {
-  res.json({ success: true, models: modelos });
-});
 
 const modelos = [
   'gemini-4-argon',
@@ -6913,7 +6910,15 @@ const modelos = [
 ];
 
 
-// Cada modelo possui seu próprio endpoint
+// Listar modelos somente em /models
+router.get('/models', (req, res) => {
+  return res.json({
+    success: true,
+    models: modelos
+  });
+});
+
+// Endpoint individual de cada modelo
 router.get('/:modelo', async (req, res) => {
   const modelo = req.params.modelo;
   const texto = req.query.texto;
@@ -6921,8 +6926,7 @@ router.get('/:modelo', async (req, res) => {
   if (!modelos.includes(modelo)) {
     return res.status(404).json({
       success: false,
-      error: 'Modelo não encontrado',
-      models: modelos
+      error: 'Modelo não encontrado'
     });
   }
 
@@ -6936,21 +6940,19 @@ router.get('/:modelo', async (req, res) => {
   try {
     const resposta = await ask(modelo, String(texto));
 
-    res.json({
+    return res.json({
       success: true,
       model: modelo,
       response: resposta
     });
-
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       model: modelo,
       error: error.message
     });
   }
 });
-
 
 const gptModels = [
   'gpt-4', 'gpt-4-0613', 'gpt-4-32k', 'gpt-4-0314', 'gpt-4-32k-0314',
