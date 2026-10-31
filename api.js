@@ -41,6 +41,7 @@ const { EditedMessage } = require("telegram/events/EditedMessage");
 const input = require('input');
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const https = require ('https');
+const { ask } = require('unlimited-ai');
 const { AI } = require('unlimited-ai');
 const { gpt, bing, llama, blackbox } = require('gpti'); 
 const ai = require('./ais');
