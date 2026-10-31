@@ -6858,58 +6858,99 @@ router.get('/stabilityai', async (req, res) => {
 
 //inteligência artificial 
 
-// Lista completa de modelos suportados
-const modelos = [
-  "grok-3", "grok-3-reason", "deepseek-r1", "deepseek-r1-0528",
-  "deepseek-v3-0324", "gpt-4.1", "gpt-4.1-mini", "gpt-4o",
-  "gpt-4o-2024-11-20", "claude-opus-4-20250514",
-  "claude-sonnet-4-20250514", "claude-3-7-sonnet-20250219",
-  "claude-3-7-sonnet-20250219-thinking", "claude-3-5-sonnet",
-  "claude-3-5-sonnet-20241022", "claude-opus-4-20250514-t",
-  "claude-sonnet-4-20250514-t", "claude-3-7-sonnet-20250219-t",
-  "gemini-2.5-pro-preview-05-06", "gemini-2.5-pro-preview-06-05",
-  "gemini-2.5-pro-preview-03-25", "gemini-2.5-pro-official",
-  "gemini-2.5-flash-preview-05-20", "gemini-flash", "gemini-2.0-flash",
-  "o3", "o4-mini", "imagen-4.0-generate-preview-05-20",
-  "imagen-4.0-ultra-generate-exp-05-20"
-];
-
-// rota: /ias → mostra os modelos disponíveis
-router.get('/ias', (req, res) => {
-  res.json({
-    mensagem: "Modelos disponíveis para uso:",
-    modelos
-  });
+router.get('/models', (req, res) => {
+  res.json({ success: true, models: modelos });
 });
 
-// rota: /ias/:modelo?texto=...
-router.get('/ias/:modelo', async (req, res) => {
-  const { modelo } = req.params;
-  const { texto } = req.query;
+const modelos = [
+  'gemini-4-argon',
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3.1-pro',
+  'gemini-3.1-pro-preview',
+  'gemini-3.1-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash',
+  'gemini-3-flash-preview',
+  'gemini-2.5-pro',
+  'gemini-3.1-pro-preview-vertex',
+  'gemini-2.5-pro-vertex',
+  'gpt-6-astra',
+  'gpt-6.1-sol',
+  'gpt-6-sol',
+  'gpt-6-luna',
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'gpt-5.6-luna',
+  'gpt-5.5',
+  'gpt-5.4',
+  'gpt-5.4-mini',
+  'gpt-5',
+  'gpt-5-chat-latest',
+  'gpt-4o',
+  'gpt-4o-2024-11-20',
+  'gpt-4.1-mini',
+  'gpt-4.1-nano',
+  'grok-4.7',
+  'grok-4-7',
+  'grok-4.6',
+  'grok-4-6',
+  'grok-4-5',
+  'deepseek-v4.1-flash',
+  'deepseek-v4-pro',
+  'deepseek-v4-pro-0813',
+  'kimi-k3',
+  'kimi-k2.7-code',
+  'kimi-k2.6',
+  'glm-5.3-flash',
+  'glm-5.3',
+  'glm-5.2',
+  'minimax-m3',
+  'qwen3.7-max'
+];
 
-  // Verifica se o modelo existe
+
+// Cada modelo possui seu próprio endpoint
+router.get('/:modelo', async (req, res) => {
+  const modelo = req.params.modelo;
+  const texto = req.query.texto;
+
   if (!modelos.includes(modelo)) {
     return res.status(404).json({
-      erro: "Modelo não encontrado",
-      disponiveis: modelos
+      success: false,
+      error: 'Modelo não encontrado',
+      models: modelos
     });
   }
 
-  if (!texto) {
-    return res.status(400).json({ erro: 'Parâmetro ?texto= é obrigatório.' });
+  if (!texto || !String(texto).trim()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Informe o parâmetro ?texto='
+    });
   }
 
   try {
-    const ia = new AI()
-      .setModel(modelo)
-      .addMessage({ role: 'user', content: texto });
+    const resposta = await ask(modelo, String(texto));
 
-    const resposta = await ia.generate();
-    res.json({ modelo, resposta });
-  } catch (err) {
-    res.status(500).json({ erro: 'Erro ao gerar resposta: ' + err.message });
+    res.json({
+      success: true,
+      model: modelo,
+      response: resposta
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      model: modelo,
+      error: error.message
+    });
   }
 });
+
+
 const gptModels = [
   'gpt-4', 'gpt-4-0613', 'gpt-4-32k', 'gpt-4-0314', 'gpt-4-32k-0314',
   'gpt-3.5-turbo', 'gpt-3.5-turbo-16k', 'gpt-3.5-turbo-0613',
