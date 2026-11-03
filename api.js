@@ -1128,118 +1128,353 @@ router.get('/boneco', async (req, res) => {
   }
 });
 
-
-// --- FUNÇÕES DE APOIO ---
+const HEADERS = {
+  Accept: "application/json, text/plain, */*",
+  "Content-Type": "application/json",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+  Origin: "https://any4k.com",
+  Referer: "https://any4k.com/"
+};
 
 function getYoutubeId(videoUrl) {
   try {
     const url = new URL(videoUrl);
-    if (url.hostname.includes("youtu.be")) return url.pathname.split("/").filter(Boolean)[0];
-    if (url.pathname.includes("/shorts/")) return url.pathname.split("/shorts/")[1]?.split("/")[0];
+    const host = url.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] || null;
+    if (!host.endsWith("youtube.com")) return null;
+    if (url.pathname.startsWith("/shorts/")) return url.pathname.split("/")[2] || null;
+    if (url.pathname.startsWith("/embed/")) return url.pathname.split("/")[2] || null;
     return url.searchParams.get("v");
-  } catch (e) { return null; }
-}
-
-function findVideoData(nuxtData) {
-  const items = Object.values(nuxtData.data || {});
-  for (const item of items) {
-    if (item && item.data && (item.data.raw_audio || item.data.raw_video)) return item.data;
+  } catch (_) {
+    return null;
   }
-  throw new Error("Dados não encontrados");
 }
 
-// --- FUNÇÃO PRINCIPAL (VALIDADA) ---
+function getDeviceId() {
+  return crypto.randomUUID().replace(/-/g, "");
+}
 
-async function getAny4kLink(videoUrl, tipo) {
-  console.log(`[${tipo}] ⚡ Modo Rápido: ${videoUrl}`);
+function unwrap(value) {
+  let current = value;
+  for (let i = 0; i < 4; i += 1) {
+    if (!current || typeof current !== "object" || Array.isArray(current)) break;
+    const next = current.data ?? current.result ?? current.response;
+    if (!next || next === current) break;
+    current = next;
+  }
+  return current;
+}
 
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") return Object.values(value);
+  return [];
+}
+
+function getFormats(payload, type) {
+  const data = unwrap(payload) || {};
+  const audio = [data.raw_audio, data.audio, data.rawAudio, data.mp3, data.formats_audio];
+  const video = [data.raw_video, data.video, data.rawVideo, data.mp4, data.download, data.formats];
+  return (type === "musica" || type === "linkmp3" ? audio : video)
+    .flatMap(asArray)
+    .filter(Boolean);
+}
+
+function getFormatId(format) {
+  return format?.id ?? format?.format_id ?? format?.formatId ?? format?.itag ?? format?.code;
+}
+
+function getDownloadId(payload) {
+  const data = unwrap(payload) || {};
+  return data.id ?? data.downloadId ?? data.fileId ?? data.taskId;
+}
+
+function chooseFormat(formats, type) {
+  const isAudio = type === "musica" || type === "linkmp3";
+  if (isAudio) {
+    // O Any4K costuma listar Opus/WebM antes de M4A; M4A é a opção mais compatível.
+    return formats.find(item => String(item.ext || "").toLowerCase() === "m4a") || formats[0];
+  }
+  return formats.find(item => String(item.ext || "").toLowerCase() === "mp4") || formats[0];
+}
+
+function describeError(error) {
+  const body = error.response?.data;
+  if (typeof body === "string" && body.trim()) return body.slice(0, 500);
+  if (body?.err_msg || body?.message) return body.err_msg || body.message;
+  if (error.code === "ECONNABORTED") return "Any4K demorou demais para responder";
+  return error.message || "erro desconhecido";
+}
+
+async function postAny4k(endpoint, payload) {
+  try {
+    const response = await axios.post(`https://api.any4k.com/v1/dlp/${endpoint}`, payload, {
+      headers: HEADERS,
+      timeout: API_TIMEOUT,
+      validateStatus: () => true
+    });
+    if (response.status < 200 || response.status >= 300) {
+      const error = new Error(`Any4K respondeu HTTP ${response.status}`);
+      error.response = response;
+      throw error;
+    }
+    if (response.data?.err_code && response.data.err_code !== 0) {
+      const error = new Error(response.data.err_msg || `Any4K retornou erro ${response.data.err_code}`);
+      error.response = response;
+      throw error;
+    }
+    return response.data;
+  } catch (error) {
+    throw new Error(`Falha no Any4K: ${describeError(error)}`);
+  }
+}
+
+async function waitForDownload(downloadId) {
+  const progressUrl = `https://api.any4k.com/v1/dlp/download_progress?id=${encodeURIComponent(downloadId)}`;
+  const deadline = Date.now() + FILE_TIMEOUT;
+
+  while (Date.now() < deadline) {
+    try {
+      const response = await axios.get(progressUrl, {
+        headers: { ...HEADERS, Accept: "text/event-stream" },
+        responseType: "stream",
+        timeout: Math.min(30000, Math.max(5000, deadline - Date.now())),
+        validateStatus: () => true
+      });
+
+      if (response.status < 200 || response.status >= 300) {
+        response.data?.destroy?.();
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const done = await new Promise((resolve, reject) => {
+        let buffer = "";
+        const stream = response.data;
+        const finish = value => {
+          stream.destroy?.();
+          resolve(value);
+        };
+        stream.on("data", chunk => {
+          buffer += chunk.toString();
+          const events = buffer.split(/\r?\n\r?\n/);
+          buffer = events.pop() || "";
+          for (const event of events) {
+            if (/event:\s*done/.test(event)) finish(true);
+            if (/event:\s*error/.test(event)) reject(new Error(event.replace(/\n/g, " ").slice(0, 500)));
+          }
+        });
+        stream.on("end", () => finish(false));
+        stream.on("error", reject);
+      });
+      if (done) return `https://api.any4k.com/v1/file/o?i=${encodeURIComponent(downloadId)}`;
+    } catch (error) {
+      if (Date.now() >= deadline) throw error;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  throw new Error("Any4K não concluiu o download dentro do tempo limite");
+}
+
+async function getAny4kLink(videoUrl, type) {
   const videoId = getYoutubeId(videoUrl);
-  if (!videoId) throw new Error("URL inválida");
+  if (!videoId) throw new Error("URL do YouTube inválida");
 
-  // 1. Pega dados básicos
-  const { data: html } = await axios.get(`https://any4k.com/pt/download/youtube/${videoId}`, {
-    headers: { "User-Agent": "Mozilla/5.0" }
+  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const payload = {
+    url: youtubeUrl,
+    lang: "pt",
+    country: "BR",
+    platform: "Web",
+    deviceId: getDeviceId(),
+    sysVer: "1.0.0",
+    appVer: "1.0.0",
+    bundleId: "com.any4k.api"
+  };
+
+  console.log(`[${type}] Consultando formatos...`);
+  const checkResponse = await postAny4k("check", payload);
+  if (!checkResponse.extractor || !checkResponse.id) {
+    throw new Error("Any4K não identificou este vídeo");
+  }
+
+  // A API atual separa a identificação (/check) dos formatos (/info).
+  const infoResponse = await postAny4k("info", {
+    lang: payload.lang,
+    country: payload.country,
+    platform: payload.platform,
+    sysVer: payload.sysVer,
+    appVer: payload.appVer,
+    bundleId: payload.bundleId,
+    deviceId: payload.deviceId,
+    extractor: checkResponse.extractor,
+    id: checkResponse.id
   });
+  const formats = getFormats(infoResponse, type);
+  if (!formats.length) {
+    console.error("Resposta do info:", JSON.stringify(infoResponse).slice(0, 3000));
+    throw new Error("Any4K não retornou formatos para este vídeo");
+  }
 
-  const match = html.match(/window\.__NUXT__=(.*?)<\/script>/s);
-  const sandbox = {};
-  vm.createContext(sandbox);
-  vm.runInContext(`result = ${match[1]}`, sandbox);
-  const data = findVideoData(sandbox.result);
+  const format = chooseFormat(formats.filter(item => getFormatId(item) != null), type);
+  const formatId = getFormatId(format);
+  if (formatId == null) throw new Error("Formato retornado pelo Any4K sem identificador");
 
-  const isAudio = tipo.includes("musica") || tipo === "linkmp3";
-  const arquivos = isAudio ? data.raw_audio : (data.download || data.raw_video);
-  
-  // PEGA A PRIMEIRA QUALIDADE (A MAIS LEVE E RÁPIDA)
-  const arquivo = arquivos[0]; 
+  console.log(`[${type}] Solicitando download do formato ${formatId}...`);
+  let downloadResponse;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      downloadResponse = await postAny4k("download", { ...payload, format: formatId });
+      break;
+    } catch (error) {
+      if (attempt === 3 || !error.message.includes("slot")) throw error;
+      console.log(`[${type}] Any4K está ocupado; tentando novamente em 8 segundos...`);
+      await new Promise(resolve => setTimeout(resolve, 8000));
+    }
+  }
+  const downloadId = getDownloadId(downloadResponse);
+  if (!downloadId) {
+    console.error("Resposta do download:", JSON.stringify(downloadResponse).slice(0, 3000));
+    throw new Error("Any4K não retornou o ID do download");
+  }
 
-  // 2. Solicita o download
-  const deviceId = uuidv4().replace(/-/g, "").padEnd(32, "0").substring(0, 32);
-  const { data: downloadData } = await axios.post("https://api.any4k.com/v1/dlp/download", {
-    url: `https://www.youtube.com/watch?v=${videoId}`,
-    format: arquivo.id,
-    lang: "pt", country: "BR", platform: "Web",
-    deviceId, sysVer: "1.0.0", appVer: "1.0.0", bundleId: "com.any4k.api"
-  }, { 
-    headers: { 
-      "Content-Type": "application/json", 
-      "User-Agent": "Mozilla/5.0",
-      "Referer": "https://any4k.com/"
-    } 
-  });
-
-  const linkFinal = `https://api.any4k.com/v1/file/o?i=${downloadData.id}`;
-
-  // 3. Espera curta de apenas 5 segundos (suficiente para qualidades baixas)
-  console.log(`[${tipo}] Aguardando 5s... Link: ${linkFinal}`);
-  await new Promise(r => setTimeout(r, 5000));
-
-  return linkFinal;
+  console.log(`[${type}] Aguardando arquivo...`);
+  return waitForDownload(downloadId);
 }
 
+async function getY2MateLink(videoUrl, type) {
+  const videoId = getYoutubeId(videoUrl);
+  if (!videoId) throw new Error("URL do YouTube inválida");
 
-// --- APIS ---
+  const commonHeaders = {
+    "User-Agent": HEADERS["User-Agent"],
+    Referer: "https://iframe.y2meta-uk.com/",
+    Origin: "https://iframe.y2meta-uk.com"
+  };
+
+  try {
+    const keyResponse = await axios.get("https://cnv.cx/v2/sanity/key", {
+      params: { id: videoId },
+      headers: commonHeaders,
+      timeout: API_TIMEOUT
+    });
+    const key = keyResponse.data?.key;
+    if (!key) throw new Error("Y2Mate não retornou a chave de conversão");
+
+    const isAudio = type === "musica" || type === "linkmp3";
+    const converterResponse = await axios.post(
+      "https://cnv.cx/v2/converter",
+      new URLSearchParams({
+        link: `https://youtu.be/${videoId}`,
+        format: isAudio ? "mp3" : "mp4",
+        audioBitrate: "128",
+        videoQuality: "720",
+        filenameStyle: "pretty",
+        vCodec: "h264"
+      }).toString(),
+      {
+        headers: {
+          ...commonHeaders,
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "*/*",
+          key
+        },
+        timeout: API_TIMEOUT,
+        validateStatus: () => true
+      }
+    );
+
+    if (converterResponse.status < 200 || converterResponse.status >= 300) {
+      throw new Error(`Y2Mate respondeu HTTP ${converterResponse.status}`);
+    }
+    const link = converterResponse.data?.url;
+    if (!link || !/^https?:\/\//i.test(link)) {
+      throw new Error(converterResponse.data?.message || "Y2Mate não retornou o link do arquivo");
+    }
+    console.log(`[${type}] Link Y2Mate gerado: ${link}`);
+    return link;
+  } catch (error) {
+    const detail = error.response?.data?.message || error.response?.data?.error || error.message;
+    throw new Error(`Falha no Y2Mate: ${detail}`);
+  }
+}
+
+function safeFileName(value) {
+  return String(value || "download")
+    .replace(/[\\/:*?"<>|\x00-\x1F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120) || "download";
+}
+
+async function streamY2Mate(res, videoUrl, type, title = "download") {
+  const link = await getY2MateLink(videoUrl, type);
+  const isAudio = type === "musica" || type === "linkmp3";
+  const media = await axios.get(link, {
+    headers: {
+      "User-Agent": HEADERS["User-Agent"],
+      Referer: "https://v42.www-y2mate.com/"
+    },
+    responseType: "stream",
+    timeout: API_TIMEOUT,
+    maxRedirects: 5,
+    validateStatus: () => true
+  });
+
+  if (media.status < 200 || media.status >= 300) {
+    media.data?.destroy?.();
+    throw new Error(`Y2Mate recusou o arquivo (HTTP ${media.status})`);
+  }
+
+  res.statusCode = 200;
+  res.setHeader("Content-Type", media.headers["content-type"] || (isAudio ? "audio/mpeg" : "video/mp4"));
+  if (media.headers["content-length"]) res.setHeader("Content-Length", media.headers["content-length"]);
+  res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(title)}.${isAudio ? "mp3" : "mp4"}"`);
+  media.data.on("error", error => res.destroy(error));
+  media.data.pipe(res);
+}
+
+function handleError(res, error) {
+  console.error(error.stack || error.message);
+  if (!res.headersSent) res.status(502).json({ ok: false, error: error.message });
+}
+
+async function downloadByName(res, name, type) {
+  const search = String(name || "").trim();
+  if (!search) return res.status(400).json({ ok: false, error: "Informe ?name=" });
+  const result = await ytSearch(search);
+  const video = result.videos?.[0];
+  if (!video) return res.status(404).json({ ok: false, error: "Vídeo não encontrado" });
+  return streamY2Mate(res, video.url, type, video.title);
+}
+
+async function downloadAny4kByName(res, name, type) {
+  const search = String(name || "").trim();
+  if (!search) return res.status(400).json({ ok: false, error: "Informe ?name=" });
+  const result = await ytSearch(search);
+  const video = result.videos?.[0];
+  if (!video) return res.status(404).json({ ok: false, error: "Vídeo não encontrado" });
+  return res.redirect(await getAny4kLink(video.url, type));
+}
 
 router.get("/musica", async (req, res) => {
-  const name = req.query.name;
-  if (!name) return res.status(400).send("Informe ?name=");
-  try {
-    const r = await ytSearch(name);
-    const video = r.videos[0];
-    if (!video) return res.status(404).send("Vídeo não encontrado");
-    const link = await getAny4kLink(video.url, "musica");
-    return res.redirect(link);
-  } catch (err) { return res.status(500).send("Erro: " + err.message); }
+  try { return await downloadAny4kByName(res, req.query.name, "musica"); }
+  catch (error) { return handleError(res, error); }
 });
 
 router.get("/clipe", async (req, res) => {
-  const name = req.query.name;
-  if (!name) return res.status(400).send("Informe ?name=");
-  try {
-    const r = await ytSearch(name);
-    const video = r.videos[0];
-    if (!video) return res.status(404).send("Vídeo não encontrado");
-    const link = await getAny4kLink(video.url, "clipe");
-    return res.redirect(link);
-  } catch (err) { return res.status(500).send("Erro: " + err.message); }
+  try { return await downloadAny4kByName(res, req.query.name, "clipe"); }
+  catch (error) { return handleError(res, error); }
 });
 
-router.get("/linkmp3", async (req, res) => {
-  const url = req.query.url;
-  if (!url) return res.status(400).send("Informe ?url=");
-  try {
-    const link = await getAny4kLink(url, "linkmp3");
-    return res.redirect(link);
-  } catch (err) { return res.status(500).send("Erro: " + err.message); }
+// Rotas Y2Mate: áudio/vídeo por nome e MP3/MP4 por URL.
+router.get("/play", async (req, res) => {
+  try { return await downloadByName(res, req.query.name, "musica"); }
+  catch (error) { return handleError(res, error); }
 });
 
-router.get("/linkmp4", async (req, res) => {
-  const url = req.query.url;
-  if (!url) return res.status(400).send("Informe ?url=");
-  try {
-    const link = await getAny4kLink(url, "linkmp4");
-    return res.redirect(link);
-  } catch (err) { return res.status(500).send("Erro: " + err.message); }
+router.get("/video", async (req, res) => {
+  try { return await downloadByName(res, req.query.name, "clipe"); }
+  catch (error) { return handleError(res, error); }
 });
 
 
@@ -3949,94 +4184,6 @@ router.get('/play-video', async (req, res) => {
     res.json(response.data);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar vídeo do YouTube', details: err.message });
-  }
-});
-
-// Baixar áudio pelo nome
-router.get('/play', async (req, res) => {
-  const { name } = req.query;
-
-  if (!name) {
-    return res.status(400).json({ error: 'Name is required' });
-  }
-
-  try {
-    const response = await axios.get(`https://api.vreden.my.id/api/ytplaymp3?query=${encodeURIComponent(name)}`);
-    const downloadUrl = response.data.result.download.url;
-
-    if (downloadUrl) {
-      return res.redirect(downloadUrl);  // Redireciona para o link de download do áudio
-    } else {
-      return res.status(404).json({ error: 'Download link not available' });
-    }
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-// Baixar vídeo pelo nome
-router.get('/playvideo', async (req, res) => {
-  const { name } = req.query;
-
-  if (!name) {
-    return res.status(400).json({ error: 'Name is required' });
-  }
-
-  try {
-    const response = await axios.get(`https://api.vreden.my.id/api/ytplaymp4?query=${encodeURIComponent(name)}`);
-    const downloadUrl = response.data.result.download.url;
-
-    if (downloadUrl) {
-      return res.redirect(downloadUrl);  // Redireciona para o link de download do vídeo
-    } else {
-      return res.status(404).json({ error: 'Download link not available' });
-    }
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-// Baixar áudio pelo link
-
-router.get('/ytmp3', async (req, res) => {
-  const { url } = req.query;
-  
-  if (!url) {
-    return res.status(400).json({ error: 'URL is required' });
-  }
-
-  try {
-    const response = await axios.get(`https://api.vreden.my.id/api/ytmp3?url=${url}`);
-    const downloadUrl = response.data.result.download.url;
-
-    if (downloadUrl) {
-      return res.redirect(downloadUrl);  // Redireciona para o link de download do áudio
-    } else {
-      return res.status(404).json({ error: 'Download link not available' });
-    }
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-
-// Baixar vídeo pelo link
-router.get('/ytmp4', async (req, res) => {
-  const { url } = req.query;
-
-  if (!url) {
-    return res.status(400).json({ error: 'URL is required' });
-  }
-
-  try {
-    const response = await axios.get(`https://api.vreden.my.id/api/ytmp4?url=${url}`);
-    const downloadUrl = response.data.result.download.url;
-
-    if (downloadUrl) {
-      return res.redirect(downloadUrl);  // Redireciona para o link de download do vídeo
-    } else {
-      return res.status(404).json({ error: 'Download link not available' });
-    }
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
