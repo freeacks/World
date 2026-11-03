@@ -1128,6 +1128,10 @@ router.get('/boneco', async (req, res) => {
   }
 });
 
+const API_TIMEOUT = Number(process.env.API_TIMEOUT || 60000);
+const Y2MATE_TIMEOUT = Number(process.env.Y2MATE_TIMEOUT || 60000);
+const FILE_TIMEOUT = Number(process.env.FILE_TIMEOUT || 180000);
+
 const HEADERS = {
   Accept: "application/json, text/plain, */*",
   "Content-Type": "application/json",
@@ -1355,7 +1359,7 @@ async function getY2MateLink(videoUrl, type) {
     const keyResponse = await axios.get("https://cnv.cx/v2/sanity/key", {
       params: { id: videoId },
       headers: commonHeaders,
-      timeout: API_TIMEOUT
+      timeout: Y2MATE_TIMEOUT
     });
     const key = keyResponse.data?.key;
     if (!key) throw new Error("Y2Mate não retornou a chave de conversão");
@@ -1378,7 +1382,7 @@ async function getY2MateLink(videoUrl, type) {
           Accept: "*/*",
           key
         },
-        timeout: API_TIMEOUT,
+        timeout: Y2MATE_TIMEOUT,
         validateStatus: () => true
       }
     );
@@ -1415,7 +1419,7 @@ async function streamY2Mate(res, videoUrl, type, title = "download") {
       Referer: "https://v42.www-y2mate.com/"
     },
     responseType: "stream",
-    timeout: API_TIMEOUT,
+    timeout: Y2MATE_TIMEOUT,
     maxRedirects: 5,
     validateStatus: () => true
   });
@@ -1466,6 +1470,15 @@ router.get("/clipe", async (req, res) => {
   catch (error) { return handleError(res, error); }
 });
 
+for (const [route, type] of [["/linkmp3", "linkmp3"], ["/linkmp4", "linkmp4"]]) {
+  router.get(route, async (req, res) => {
+    const url = String(req.query.url || "").trim();
+    if (!url) return res.status(400).json({ ok: false, error: "Informe ?url=" });
+    try { return res.redirect(await getAny4kLink(url, type)); }
+    catch (error) { return handleError(res, error); }
+  });
+}
+
 // Rotas Y2Mate: áudio/vídeo por nome e MP3/MP4 por URL.
 router.get("/play", async (req, res) => {
   try { return await downloadByName(res, req.query.name, "musica"); }
@@ -1474,6 +1487,20 @@ router.get("/play", async (req, res) => {
 
 router.get("/video", async (req, res) => {
   try { return await downloadByName(res, req.query.name, "clipe"); }
+  catch (error) { return handleError(res, error); }
+});
+
+router.get("/ytmp3", async (req, res) => {
+  const url = String(req.query.url || "").trim();
+  if (!url) return res.status(400).json({ ok: false, error: "Informe ?url=" });
+  try { return await streamY2Mate(res, url, "linkmp3"); }
+  catch (error) { return handleError(res, error); }
+});
+
+router.get("/ytmp4", async (req, res) => {
+  const url = String(req.query.url || "").trim();
+  if (!url) return res.status(400).json({ ok: false, error: "Informe ?url=" });
+  try { return await streamY2Mate(res, url, "linkmp4"); }
   catch (error) { return handleError(res, error); }
 });
 
